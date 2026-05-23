@@ -1,0 +1,11 @@
+.env
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.db
+jarvis_memory.db
+speech_*.mp3
+test_voice.mp3
+.DS_Store
+*.log
