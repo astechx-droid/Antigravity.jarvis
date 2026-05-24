@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#0a0000">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>JARVIS A.I. Interface</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Rajdhani:wght@400;500;600;700&family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <!-- Live animated wallpaper (no download needed) -->
+    <div class="bg-media" aria-hidden="true">
+        <canvas id="jarvis-bg-canvas" class="bg-canvas"></canvas>
+    </div>
+    <div class="bg-lab"></div>
+    <div class="scanlines"></div>
+    <div class="vignette"></div>
+
+    <!-- TOP BAR -->
+    <header class="top-bar">
+        <div class="top-icons">
+            <span class="hex-icon"></span>
+            <span class="hex-icon"></span>
+            <span class="hex-icon"></span>
+        </div>
+        <h1 class="main-title">JARVIS A.I. INTERFACE</h1>
+        <div class="top-clock">
+            <span id="header-time">00:00</span>
+            <span id="header-date">01 JAN 2026</span>
+        </div>
+    </header>
+
+    <div class="app-shell">
+        <!-- LEFT COLUMN -->
+        <aside class="col col-left" data-panel="diagnostics">
+            <section class="hud-panel">
+                <h2 class="panel-title">SYSTEM DIAGNOSTICS</h2>
+                <div class="gauge-row">
+                    <div class="gauge" data-gauge="cpu">
+                        <svg viewBox="0 0 80 80"><circle class="gauge-bg" cx="40" cy="40" r="34"/><circle class="gauge-fill" id="cpu-ring" cx="40" cy="40" r="34"/></svg>
+                        <span class="gauge-val" id="cpu-val">0%</span>
+                        <span class="gauge-label">CPU</span>
+                    </div>
+                    <div class="gauge" data-gauge="ram">
+                        <svg viewBox="0 0 80 80"><circle class="gauge-bg" cx="40" cy="40" r="34"/><circle class="gauge-fill" id="ram-ring" cx="40" cy="40" r="34"/></svg>
+                        <span class="gauge-val" id="ram-val">0%</span>
+                        <span class="gauge-label">MEMORY</span>
+                    </div>
+                    <div class="gauge" data-gauge="net">
+                        <svg viewBox="0 0 80 80"><circle class="gauge-bg" cx="40" cy="40" r="34"/><circle class="gauge-fill gauge-fill-net" id="net-ring" cx="40" cy="40" r="34"/></svg>
+                        <span class="gauge-val gauge-val-sm" id="net-val">OK</span>
+                        <span class="gauge-label">NETWORK</span>
+                    </div>
+                </div>
+                <div class="sparkline-wrap">
+                    <canvas id="sparkline" width="240" height="48"></canvas>
+                </div>
+            </section>
+
+            <section class="hud-panel panel-env">
+                <h2 class="panel-title">ENVIRONMENTAL MONITORING</h2>
+                <div class="env-grid">
+                    <div class="env-gauge">
+                        <div class="env-ring"><span id="temp-val">24°</span></div>
+                        <span class="env-caption">LOCAL TEMP</span>
+                    </div>
+                    <div class="env-tags">
+                        <span class="env-tag active">GLOW</span>
+                        <span class="env-tag active">GRIDS</span>
+                        <span class="env-tag">SCHEMATICS</span>
+                        <span class="env-tag">TEXT</span>
+                    </div>
+                </div>
+            </section>
+
+            <section class="hud-panel">
+                <h2 class="panel-title">TASK OVERVIEW</h2>
+                <div class="task-summary">
+                    <span><strong id="tasks-active">1</strong> ACTIVE</span>
+                    <span><strong id="tasks-pending">0</strong> PENDING</span>
+                </div>
+                <ul class="task-list" id="task-list">
+                    <li class="task-item done"><span class="task-check">✓</span> Neural bridge online</li>
+                    <li class="task-item active"><span class="task-check">○</span> Voice recognition</li>
+                    <li class="task-item"><span class="task-check">○</span> Awaiting command</li>
+                </ul>
+            </section>
+        </aside>
+
+        <!-- CENTER -->
+        <main class="col col-center active-panel" data-panel="core">
+            <section class="core-section">
+                <div class="reactor-wrap" id="reactor-trigger">
+                    <div class="reactor-outer"></div>
+                    <div class="reactor-mid"></div>
+                    <div class="reactor-inner">
+                        <div class="core-fire"></div>
+                        <div class="core-glow" id="core-glow"></div>
+                        <p class="core-title">JARVIS<br>PROTOCOL A.I.</p>
+                    </div>
+                </div>
+                <div class="core-status-block">
+                    <p><span>CORE STATUS:</span> <strong id="status-tag">STANDBY</strong></p>
+                    <p><span>ENERGY FLUX:</span> <strong id="energy-flux">72%</strong></p>
+                    <p><span>NEURAL LINK:</span> <strong id="neural-link">STANDBY</strong></p>
+                </div>
+            </section>
+
+            <section class="command-section">
+                <div id="live-transcript" class="live-transcript">Tap mic or say "Hey Jarvis"...</div>
+                <p class="wake-hint">SAY: <span class="accent">"HEY JARVIS"</span></p>
+                <div class="command-actions">
+                    <button id="manual-mic" class="btn-mic" aria-label="Wake Jarvis">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                            <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                            <line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/>
+                        </svg>
+                    </button>
+                    <button id="unlock-voice" class="btn-action">UNLOCK VOICE</button>
+                </div>
+            </section>
+        </main>
+
+        <!-- RIGHT COLUMN -->
+        <aside class="col col-right" data-panel="comms">
+            <section class="hud-panel">
+                <h2 class="panel-title">COMMUNICATIONS HUB</h2>
+                <div class="hub-tabs">
+                    <button class="hub-tab active" data-tab="logs">AI LOGS</button>
+                    <button class="hub-tab" data-tab="chat">CHAT</button>
+                </div>
+                <div class="chat-viewport" id="chat-box">
+                    <div class="chat-message jarvis-msg">Neural bridge established. Awaiting voice command, Mr Aryan.</div>
+                </div>
+                <div class="terminal-viewport" id="terminal-box">
+                    <div class="terminal-line">[SYSTEM] Matrix initialized...</div>
+                </div>
+            </section>
+
+            <section class="hud-panel">
+                <h2 class="panel-title">PROJECT MANAGEMENT</h2>
+                <ul class="project-list">
+                    <li><span>Voice Engine</span><div class="proj-bar"><div style="width:92%"></div></div></li>
+                    <li><span>Neural Brain</span><div class="proj-bar"><div style="width:88%"></div></div></li>
+                    <li><span>Memory Core</span><div class="proj-bar"><div style="width:75%"></div></div></li>
+                    <li><span>Search Tools</span><div class="proj-bar"><div id="search-proj-bar" style="width:40%"></div></div></li>
+                </ul>
+            </section>
+
+            <section class="hud-panel panel-map">
+                <h2 class="panel-title">GLOBAL NETWORK MAP</h2>
+                <div class="world-map">
+                    <svg viewBox="0 0 360 180" class="map-svg">
+                        <ellipse cx="180" cy="90" rx="170" ry="75" class="map-outline"/>
+                        <circle class="map-dot pulse-dot-map" cx="95" cy="75" r="4"/>
+                        <circle class="map-dot" cx="200" cy="65" r="3"/>
+                        <circle class="map-dot" cx="260" cy="95" r="3"/>
+                        <circle class="map-dot" cx="140" cy="110" r="3"/>
+                    </svg>
+                    <span class="map-label" id="net-label">LINK: STANDBY</span>
+                </div>
+            </section>
+        </aside>
+    </div>
+
+    <!-- BOTTOM NAV (Android-style) -->
+    <nav class="bottom-nav">
+        <button class="nav-btn active" data-nav="core">
+            <span class="nav-icon">◉</span>
+            <span>Core</span>
+        </button>
+        <button class="nav-btn" data-nav="diagnostics">
+            <span class="nav-icon">◈</span>
+            <span>Systems</span>
+        </button>
+        <button class="nav-btn" data-nav="comms">
+            <span class="nav-icon">◎</span>
+            <span>Comms</span>
+        </button>
+        <button class="nav-btn" id="nav-command">
+            <span class="nav-icon">▶</span>
+            <span>Command</span>
+        </button>
+        <button class="nav-btn" id="nav-settings">
+            <span class="nav-icon">⚙</span>
+            <span>Settings</span>
+        </button>
+    </nav>
+
+    <footer class="hud-footer">
+        <span>ENCRYPTION: AES-256</span>
+        <span class="footer-toggles">| GLOW | GRIDS | SCHEMATICS |</span>
+        <span id="footer-uptime">UPTIME 0s</span>
+    </footer>
+
+    <script src="jarvis-bg.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
