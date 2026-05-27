@@ -113,17 +113,7 @@ class VoiceEngine:
 
         text = re.sub(r'\s+', ' ', text).strip()
 
-        replacements = {
-            "AI": "Artificial Intelligence",
-            "A.I.": "Artificial Intelligence",
-            "GPT": "G P T",
-            "API": "A P I",
-            "HTML": "H T M L",
-            "CSS": "C S S",
-            "JS": "Java Script",
-            "SQL": "S Q L",
-            "JarvisAI": "Jarvis AI"
-        }
+        replacements = {}
 
         for old, new in replacements.items():
             text = text.replace(old, new)
