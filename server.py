@@ -5,6 +5,18 @@ from fastapi.middleware.cors import CORSMiddleware
 from brain import Brain
 from voice_engine import VoiceEngine
 
+import os
+
+# =====================================================
+# CREATE STATIC FOLDER
+# =====================================================
+
+os.makedirs("static", exist_ok=True)
+
+# =====================================================
+# APP
+# =====================================================
+
 app = FastAPI(title="JARVIS")
 
 # =====================================================
@@ -20,10 +32,14 @@ app.add_middleware(
 )
 
 # =====================================================
-# STATIC
+# STATIC FILES
 # =====================================================
 
-app.mount("/static", StaticFiles(directory="static"), name="static")
+app.mount(
+    "/static",
+    StaticFiles(directory="static"),
+    name="static"
+)
 
 # =====================================================
 # INIT
@@ -63,7 +79,7 @@ async def chat(request: Request):
         # AI response
         response_text = await brain.think(user_text)
 
-        # Generate voice
+        # Generate TTS
         audio_file = await voice.generate_voice(
             response_text
         )
