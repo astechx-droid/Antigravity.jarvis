@@ -1,18 +1,23 @@
 from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
+
+from brain import Brain
+from config import OPENROUTER_API_KEY
+
 import uvicorn
 import os
 import psutil
 import time
 
-from main import process_query
-
 app = FastAPI(title="JARVIS")
 
 _START_TIME = time.time()
 
+# ---------------------------------------------------------
 # CORS
+# ---------------------------------------------------------
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -21,13 +26,33 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ---------------------------------------------------------
+# INIT BRAIN
+# ---------------------------------------------------------
+
+brain = Brain()
+
+# ---------------------------------------------------------
+# HEALTH
+# ---------------------------------------------------------
+
 @app.get("/health")
 async def health():
 
+    key_ok = bool(
+        OPENROUTER_API_KEY and
+        "your_key" not in OPENROUTER_API_KEY
+    )
+
     return {
-        "status": "ok",
+        "status": "ok" if key_ok else "missing_api_key",
+        "openrouter": key_ok,
         "uptime": round(time.time() - _START_TIME, 0),
     }
+
+# ---------------------------------------------------------
+# CHAT
+# ---------------------------------------------------------
 
 @app.post("/chat")
 async def chat(request: Request):
@@ -41,19 +66,42 @@ async def chat(request: Request):
             "response": "I didn't catch that, Mr Aryan."
         }
 
-    try:
-
-        response = await process_query(user_input)
+    if not OPENROUTER_API_KEY:
 
         return {
-            "response": response
+            "response": "OpenRouter API key missing on server."
+        }
+
+    try:
+
+        response_text = await brain.think(user_input)
+
+        return {
+            "response": response_text
         }
 
     except Exception as e:
 
         return {
-            "response": f"Error: {str(e)}"
+            "response": f"Server Error: {str(e)}"
         }
+
+# ---------------------------------------------------------
+# HISTORY
+# ---------------------------------------------------------
+
+@app.get("/history")
+async def get_history():
+
+    history = brain.memory.get_recent_history()
+
+    return {
+        "history": history
+    }
+
+# ---------------------------------------------------------
+# STATS
+# ---------------------------------------------------------
 
 @app.get("/stats")
 async def get_stats():
@@ -76,8 +124,19 @@ async def get_stats():
         "uptime": round(time.time() - _START_TIME, 0),
     }
 
-# Static files
-app.mount("/", StaticFiles(directory=".", html=True), name="static")
+# ---------------------------------------------------------
+# STATIC FILES
+# ---------------------------------------------------------
+
+app.mount(
+    "/",
+    StaticFiles(directory=".", html=True),
+    name="static"
+)
+
+# ---------------------------------------------------------
+# MAIN
+# ---------------------------------------------------------
 
 if __name__ == "__main__":
 
