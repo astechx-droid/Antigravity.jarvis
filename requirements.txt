@@ -8,3 +8,6 @@ SpeechRecognition
 langdetect
 psutil
 pydub
+playsound==1.3.0
+langdetect
+SpeechRecognition
