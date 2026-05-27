@@ -1,27 +1,17 @@
 from fastapi import FastAPI, Request
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 
-from brain import Brain
-from voice_engine import VoiceEngine
-
+import edge_tts
 import os
+from uuid import uuid4
 
-# =====================================================
-# CREATE STATIC FOLDER
-# =====================================================
+app = FastAPI()
 
-os.makedirs("static", exist_ok=True)
-
-# =====================================================
-# APP
-# =====================================================
-
-app = FastAPI(title="JARVIS")
-
-# =====================================================
+# -------------------------------
 # CORS
-# =====================================================
+# -------------------------------
 
 app.add_middleware(
     CORSMiddleware,
@@ -31,67 +21,74 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# =====================================================
-# STATIC FILES
-# =====================================================
+# -------------------------------
+# STATIC SETUP
+# -------------------------------
 
-app.mount(
-    "/static",
-    StaticFiles(directory="static"),
-    name="static"
-)
+if not os.path.exists("static"):
+    os.makedirs("static")
 
-# =====================================================
-# INIT
-# =====================================================
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
-brain = Brain()
-voice = VoiceEngine()
-
-# =====================================================
-# ROUTES
-# =====================================================
+# -------------------------------
+# ROOT
+# -------------------------------
 
 @app.get("/")
-async def home():
+async def root():
+    return {"status": "Jarvis server online"}
 
-    return {
-        "status": "Jarvis Online"
-    }
+# -------------------------------
+# TTS API
+# -------------------------------
 
-
-@app.post("/chat")
-async def chat(request: Request):
-
+@app.post("/api/tts")
+async def tts(request: Request):
     try:
-
         data = await request.json()
 
-        user_text = data.get("text", "")
+        text = data.get("text", "").strip()
 
-        if not user_text:
+        if not text:
+            return JSONResponse(
+                status_code=400,
+                content={"error": "No text provided"}
+            )
 
-            return {
-                "response": "Please say something.",
-                "audio": None
-            }
+        # Hindi / English Voice
+        hindi_words = [
+            "hai", "kya", "kaise", "mera",
+            "bhai", "yaar", "tum", "main"
+        ]
 
-        # AI response
-        response_text = await brain.think(user_text)
+        lower = text.lower()
 
-        # Generate TTS
-        audio_file = await voice.generate_voice(
-            response_text
+        if any(word in lower for word in hindi_words):
+            voice = "hi-IN-MadhurNeural"
+        else:
+            voice = "en-IN-PrabhatNeural"
+
+        filename = f"{uuid4()}.mp3"
+        filepath = os.path.join("static", filename)
+
+        communicate = edge_tts.Communicate(
+            text=text,
+            voice=voice,
+            rate="+10%"
         )
 
+        await communicate.save(filepath)
+
         return {
-            "response": response_text,
-            "audio": audio_file
+            "audio_url": f"/static/{filename}"
         }
 
     except Exception as e:
+        print("[TTS ERROR]", e)
 
-        return {
-            "response": f"Server Error: {str(e)}",
-            "audio": None
-        }
+        return JSONResponse(
+            status_code=500,
+            content={
+                "error": str(e)
+            }
+        )
