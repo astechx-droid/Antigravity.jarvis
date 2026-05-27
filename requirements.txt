@@ -1,14 +1,13 @@
 fastapi
 uvicorn
+gunicorn
 requests
 python-dotenv
 edge-tts
 langdetect
-SpeechRecognition
 openai
 httpx
 jinja2
 aiofiles
 python-multipart
 psutil
-gunicorn
