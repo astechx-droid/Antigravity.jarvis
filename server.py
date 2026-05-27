@@ -3,20 +3,13 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 
 from brain import Brain
-from config import OPENROUTER_API_KEY
-
-import uvicorn
-import os
-import psutil
-import time
+from voice_engine import VoiceEngine
 
 app = FastAPI(title="JARVIS")
 
-_START_TIME = time.time()
-
-# ---------------------------------------------------------
+# =====================================================
 # CORS
-# ---------------------------------------------------------
+# =====================================================
 
 app.add_middleware(
     CORSMiddleware,
@@ -26,124 +19,63 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ---------------------------------------------------------
-# INIT BRAIN
-# ---------------------------------------------------------
+# =====================================================
+# STATIC
+# =====================================================
+
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+# =====================================================
+# INIT
+# =====================================================
 
 brain = Brain()
+voice = VoiceEngine()
 
-# ---------------------------------------------------------
-# HEALTH
-# ---------------------------------------------------------
+# =====================================================
+# ROUTES
+# =====================================================
 
-@app.get("/health")
-async def health():
-
-    key_ok = bool(
-        OPENROUTER_API_KEY and
-        "your_key" not in OPENROUTER_API_KEY
-    )
+@app.get("/")
+async def home():
 
     return {
-        "status": "ok" if key_ok else "missing_api_key",
-        "openrouter": key_ok,
-        "uptime": round(time.time() - _START_TIME, 0),
+        "status": "Jarvis Online"
     }
 
-# ---------------------------------------------------------
-# CHAT
-# ---------------------------------------------------------
 
 @app.post("/chat")
 async def chat(request: Request):
 
-    data = await request.json()
-
-    user_input = data.get("text", "")
-
-    if not user_input:
-        return {
-            "response": "I didn't catch that, Mr Aryan."
-        }
-
-    if not OPENROUTER_API_KEY:
-
-        return {
-            "response": "OpenRouter API key missing on server."
-        }
-
     try:
 
-        response_text = await brain.think(user_input)
+        data = await request.json()
+
+        user_text = data.get("text", "")
+
+        if not user_text:
+
+            return {
+                "response": "Please say something.",
+                "audio": None
+            }
+
+        # AI response
+        response_text = await brain.think(user_text)
+
+        # Generate voice
+        audio_file = await voice.generate_voice(
+            response_text
+        )
 
         return {
-            "response": response_text
+            "response": response_text,
+            "audio": audio_file
         }
 
     except Exception as e:
 
         return {
-            "response": f"Server Error: {str(e)}"
+            "response": f"Server Error: {str(e)}",
+            "audio": None
         }
-
-# ---------------------------------------------------------
-# HISTORY
-# ---------------------------------------------------------
-
-@app.get("/history")
-async def get_history():
-
-    history = brain.memory.get_recent_history()
-
-    return {
-        "history": history
-    }
-
-# ---------------------------------------------------------
-# STATS
-# ---------------------------------------------------------
-
-@app.get("/stats")
-async def get_stats():
-
-    cpu = psutil.cpu_percent(interval=None)
-
-    ram = psutil.virtual_memory().percent
-
-    net_io = psutil.net_io_counters()
-
-    net_total = (
-        net_io.bytes_sent +
-        net_io.bytes_recv
-    ) / 1024 / 1024
-
-    return {
-        "cpu": cpu,
-        "ram": ram,
-        "network": round(net_total, 2),
-        "uptime": round(time.time() - _START_TIME, 0),
-    }
-
-# ---------------------------------------------------------
-# STATIC FILES
-# ---------------------------------------------------------
-
-app.mount(
-    "/",
-    StaticFiles(directory=".", html=True),
-    name="static"
-)
-
-# ---------------------------------------------------------
-# MAIN
-# ---------------------------------------------------------
-
-if __name__ == "__main__":
-
-    port = int(os.environ.get("PORT", 8000))
-
-    uvicorn.run(
-        app,
-        host="0.0.0.0",
-        port=port
-    )
