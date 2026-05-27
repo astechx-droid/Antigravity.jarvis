@@ -6,19 +6,12 @@ import time
 from uuid import uuid4
 
 import edge_tts
-import pygame
 from langdetect import detect
 
-# Initialize pygame mixer
-if not pygame.mixer.get_init():
-    pygame.mixer.init(
-        frequency=22050,
-        size=-16,
-        channels=1,
-        buffer=512
-    )
+# ---------------------------------------------------------
+# HINGLISH DETECTION
+# ---------------------------------------------------------
 
-# Hinglish/Hindi detection words
 HINGLISH_WORDS = {
     "main", "hoon", "hu", "hai", "hain", "ho",
     "aap", "tum", "mera", "meri", "mere",
@@ -33,9 +26,6 @@ HINGLISH_WORDS = {
 
 
 def is_hindi_or_hinglish(text):
-    """Detect Hindi or Hinglish."""
-
-    # Detect Hindi script
     if any('\u0900' <= ch <= '\u097f' for ch in text):
         return True
 
@@ -48,6 +38,10 @@ def is_hindi_or_hinglish(text):
 
     return matches >= 2 or (matches / len(words)) >= 0.2
 
+
+# ---------------------------------------------------------
+# VOICE ENGINE
+# ---------------------------------------------------------
 
 class VoiceEngine:
 
@@ -68,6 +62,9 @@ class VoiceEngine:
         self.stop_event = threading.Event()
         self._bg_stopper = None
 
+        # Render/Linux detection
+        self.is_render = os.environ.get("RENDER") is not None
+
     # ---------------------------------------------------------
     # VOICE SELECTION
     # ---------------------------------------------------------
@@ -78,6 +75,7 @@ class VoiceEngine:
             return "hi-IN-SwaraNeural", "hi"
 
         try:
+
             lang = detect(text)
 
             voices = {
@@ -93,13 +91,11 @@ class VoiceEngine:
             return "en-IN-PrabhatNeural", "en"
 
     # ---------------------------------------------------------
-    # TEXT CLEANING
+    # CLEAN TEXT
     # ---------------------------------------------------------
 
     def clean_text(self, text):
-        """Clean text for natural speech."""
 
-        # Remove think tags
         text = re.sub(
             r'<think>.*?</think>',
             '',
@@ -107,21 +103,16 @@ class VoiceEngine:
             flags=re.DOTALL
         )
 
-        # Remove markdown/symbols
         text = re.sub(r'[*_#`~]', '', text)
 
-        # Fix spaced letters:
-        # H e l l o -> Hello
         text = re.sub(
             r'(?:\b[a-zA-Z]\b(?:\s+|$)){2,}',
             lambda m: ''.join(m.group(0).split()),
             text
         )
 
-        # Remove extra spaces
         text = re.sub(r'\s+', ' ', text).strip()
 
-        # Better pronunciation replacements
         replacements = {
             "AI": "Artificial Intelligence",
             "A.I.": "Artificial Intelligence",
@@ -140,7 +131,7 @@ class VoiceEngine:
         return text
 
     # ---------------------------------------------------------
-    # SENTENCE SPLITTING
+    # SPLIT SENTENCES
     # ---------------------------------------------------------
 
     def split_sentences(self, text):
@@ -172,47 +163,6 @@ class VoiceEngine:
         return result
 
     # ---------------------------------------------------------
-    # AUDIO PLAYBACK
-    # ---------------------------------------------------------
-
-    def play_audio(self, filename):
-
-        self.is_speaking = True
-
-        try:
-
-            pygame.mixer.music.load(filename)
-            pygame.mixer.music.play()
-
-            while pygame.mixer.music.get_busy():
-
-                if self.stop_event.is_set():
-                    pygame.mixer.music.stop()
-                    break
-
-                time.sleep(0.05)
-
-        except Exception as e:
-            print(f"[Audio Error]: {e}")
-
-        finally:
-
-            try:
-                pygame.mixer.music.unload()
-            except:
-                pass
-
-            time.sleep(0.1)
-
-            if os.path.exists(filename):
-                try:
-                    os.remove(filename)
-                except:
-                    pass
-
-            self.is_speaking = False
-
-    # ---------------------------------------------------------
     # SPEAK SENTENCE
     # ---------------------------------------------------------
 
@@ -230,7 +180,6 @@ class VoiceEngine:
 
         try:
 
-            # More natural speaking rate
             speech_rate = "+18%" if lang == "hi" else "+5%"
 
             communicate = edge_tts.Communicate(
@@ -242,14 +191,32 @@ class VoiceEngine:
 
             await communicate.save(filename)
 
+            # Render pe audio play mat karo
+            if self.is_render:
+                print(f"[Render TTS]: {sentence}")
+
+                if os.path.exists(filename):
+                    os.remove(filename)
+
+                return
+
+            # Local PC pe hi play karo
+            from playsound import playsound
+
+            self.is_speaking = True
+
             await asyncio.to_thread(
-                self.play_audio,
+                playsound,
                 filename
             )
 
         except Exception as e:
 
             print(f"[TTS Error]: {e}")
+
+        finally:
+
+            self.is_speaking = False
 
             if os.path.exists(filename):
                 try:
@@ -258,74 +225,7 @@ class VoiceEngine:
                     pass
 
     # ---------------------------------------------------------
-    # VOICE STOP CALLBACK
-    # ---------------------------------------------------------
-
-    def _on_stop_phrase_heard(self, recognizer, audio):
-
-        try:
-
-            text = recognizer.recognize_google(audio)
-
-            text = text.lower().strip()
-
-            if any(p in text for p in self.STOP_PHRASES):
-
-                print("\n[Jarvis] Stop command detected.")
-
-                self.stop()
-
-        except:
-            pass
-
-    # ---------------------------------------------------------
-    # START BACKGROUND STOP LISTENER
-    # ---------------------------------------------------------
-
-    def _start_voice_stopper(self):
-
-        if self._bg_stopper is not None:
-            return
-
-        try:
-
-            import speech_recognition as sr
-
-            recognizer = sr.Recognizer()
-
-            recognizer.dynamic_energy_threshold = True
-
-            mic = sr.Microphone()
-
-            self._bg_stopper = recognizer.listen_in_background(
-                mic,
-                self._on_stop_phrase_heard,
-                phrase_time_limit=2
-            )
-
-        except Exception as e:
-
-            print(f"[Voice Stopper Error]: {e}")
-
-            self._bg_stopper = None
-
-    # ---------------------------------------------------------
-    # STOP BACKGROUND LISTENER
-    # ---------------------------------------------------------
-
-    def _stop_voice_stopper(self):
-
-        if self._bg_stopper:
-
-            try:
-                self._bg_stopper(wait_for_stop=False)
-            except:
-                pass
-
-            self._bg_stopper = None
-
-    # ---------------------------------------------------------
-    # MAIN SPEAK FUNCTION
+    # MAIN SPEAK
     # ---------------------------------------------------------
 
     async def speak(self, text):
@@ -339,39 +239,30 @@ class VoiceEngine:
 
         sentences = self.split_sentences(text)
 
-        self._start_voice_stopper()
+        for sentence in sentences:
 
-        try:
+            if self.stop_event.is_set():
+                break
 
-            for sentence in sentences:
-
-                if self.stop_event.is_set():
-                    break
-
-                await self._speak_sentence(sentence)
-
-        finally:
-
-            self._stop_voice_stopper()
+            await self._speak_sentence(sentence)
 
     # ---------------------------------------------------------
-    # STOP SPEECH
+    # STOP
     # ---------------------------------------------------------
 
     def stop(self):
 
         self.stop_event.set()
 
-        try:
-            pygame.mixer.music.stop()
-        except:
-            pass
-
     # ---------------------------------------------------------
-    # MICROPHONE LISTEN
+    # LISTEN
     # ---------------------------------------------------------
 
     def listen(self):
+
+        # Render pe microphone disabled
+        if self.is_render:
+            return ""
 
         import speech_recognition as sr
 
@@ -388,27 +279,17 @@ class VoiceEngine:
                     duration=0.5
                 )
 
-                try:
+                audio = recognizer.listen(
+                    source,
+                    timeout=10,
+                    phrase_time_limit=10
+                )
 
-                    audio = recognizer.listen(
-                        source,
-                        timeout=10,
-                        phrase_time_limit=10
-                    )
+                query = recognizer.recognize_google(audio)
 
-                    query = recognizer.recognize_google(audio)
+                return query.strip()
 
-                    return query.strip()
-
-                except:
-                    return ""
-
-        except Exception as e:
-
-            print(f"\n[Mic Error]: {e}")
-
-            time.sleep(1)
-
+        except:
             return ""
 
 
@@ -423,11 +304,7 @@ if __name__ == "__main__":
         engine = VoiceEngine()
 
         await engine.speak(
-            "Hello Aryan. "
-            "Your Jarvis voice engine is now fully upgraded. "
-            "I can now speak naturally without spelling words. "
-            "Artificial Intelligence and G P T pronunciation "
-            "will also sound much better now."
+            "Hello Aryan. Your Jarvis voice engine is now fixed."
         )
 
     asyncio.run(test())
